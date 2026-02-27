@@ -476,25 +476,16 @@ pipeline {
 
                     def apiBase = "http://${env.CONTAINER_IP}:${CONTAINER_PORT}"
 
-                    // Valid wine-quality feature payload (11 features)
-                    def validPayload = '''{
-                        "volatile_acidity": 0.70
-                        "citric_acid": 0.70
-                        "residual_sugar": 1.9
-                        "chlorides": 0.076
-                        "free_sulfur_dioxide": 11.0
-                        "total_sulfur_dioxide": 34.0
-                        "pH": 3.51
-                        "sulphates": 0.56
-                        "alcohol": 9.4
-                    }'''
+                    // Valid wine-quality feature payload — written to temp file to avoid shell quoting issues
+                    def validPayload = '{ "volatile_acidity": 0.70, "citric_acid": 0.70, "residual_sugar": 1.9, "chlorides": 0.076, "free_sulfur_dioxide": 11.0, "total_sulfur_dioxide": 34.0, "pH": 3.51, "sulphates": 0.56, "alcohol": 9.4 }'
+                    writeFile file: '/tmp/valid_payload.json', text: validPayload
 
                     def response = sh(
                         script: """
                             curl -s -w '\\nHTTP_STATUS:%{http_code}' \
                                 -X POST \
                                 -H 'Content-Type: application/json' \
-                                -d '${validPayload}' \
+                                -d @/tmp/valid_payload.json \
                                 ${apiBase}${PREDICT_ENDPOINT}
                         """,
                         returnStdout: true
@@ -564,21 +555,17 @@ pipeline {
 
                     def apiBase = "http://${env.CONTAINER_IP}:${CONTAINER_PORT}"
 
-                    // Malformed payload – missing required fields, wrong types
-                    def invalidPayload = '''{
-                        "volatile_acidity": 0.70
-                        "citric_acid": 0.70
-                        "residual_sugar": "not a num
-                        "chlorides": null
-                        
-                    }'''
+                    // Malformed payload — missing most fields, wrong types
+                    // Written to temp file to avoid shell quoting issues
+                    def invalidPayload = '{ "volatile_acidity": 0.70, "citric_acid": 0.70, "residual_sugar": "not-a-number", "chlorides": null }'
+                    writeFile file: '/tmp/invalid_payload.json', text: invalidPayload
 
                     def response = sh(
                         script: """
                             curl -s -w '\\nHTTP_STATUS:%{http_code}' \
                                 -X POST \
                                 -H 'Content-Type: application/json' \
-                                -d '${invalidPayload}' \
+                                -d @/tmp/invalid_payload.json \
                                 ${apiBase}${PREDICT_ENDPOINT}
                         """,
                         returnStdout: true
