@@ -404,8 +404,13 @@ pipeline {
 
                     echo "✔ Container started. ID: ${containerId} | IP: ${containerIp}"
                     
+                    if (containerIp == "") {
+                        error("FAILED to retrieve container IP address. Check if container is running.")
+                    }
+
                     // Override API_HOST to use internal IP and internal port
                     env.API_HOST = "http://${containerIp}:${CONTAINER_PORT}"
+                    echo "✔ API_HOST redirected to: ${env.API_HOST}"
                 }
             }
         }
@@ -419,7 +424,7 @@ pipeline {
                 script {
                     echo "============================================"
                     echo "STAGE 3: Waiting for API to become ready"
-                    echo "Health endpoint : ${API_HOST}${HEALTH_ENDPOINT}"
+                    echo "Health endpoint : ${env.API_HOST}${HEALTH_ENDPOINT}"
                     echo "Timeout         : ${HEALTH_TIMEOUT}s"
                     echo "============================================"
 
@@ -429,7 +434,7 @@ pipeline {
 
                     while (elapsed < HEALTH_TIMEOUT.toInteger()) {
                         def statusCode = sh(
-                            script: "curl -s -o /dev/null -w '%{http_code}' ${API_HOST}${HEALTH_ENDPOINT} 2>/dev/null || echo '000'",
+                            script: "curl -s -o /dev/null -w '%{http_code}' ${env.API_HOST}${HEALTH_ENDPOINT} 2>/dev/null || echo '000'",
                             returnStdout: true
                         ).trim()
 
@@ -487,7 +492,7 @@ pipeline {
                                 -X POST \
                                 -H 'Content-Type: application/json' \
                                 -d '${validPayload}' \
-                                ${API_HOST}${PREDICT_ENDPOINT}
+                                ${env.API_HOST}${PREDICT_ENDPOINT}
                         """,
                         returnStdout: true
                     ).trim()
@@ -566,7 +571,7 @@ pipeline {
                                 -X POST \
                                 -H 'Content-Type: application/json' \
                                 -d '${invalidPayload}' \
-                                ${API_HOST}${PREDICT_ENDPOINT}
+                                ${env.API_HOST}${PREDICT_ENDPOINT}
                         """,
                         returnStdout: true
                     ).trim()
