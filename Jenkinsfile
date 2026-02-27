@@ -185,7 +185,8 @@ pipeline {
 
         // Inference testing config
         CONTAINER_NAME = "wine-quality-test-${BUILD_NUMBER}"
-        API_PORT = "5000"
+        API_PORT = "5000"              // host port
+        CONTAINER_PORT = "8002"       // internal app port
         API_HOST = "http://localhost:${API_PORT}"
         HEALTH_ENDPOINT = "/health"
         PREDICT_ENDPOINT = "/predict"
@@ -378,13 +379,15 @@ pipeline {
                     echo "Exposed port   : ${API_PORT}"
                     echo "============================================"
 
+                    
+
                     // Remove any leftover container with the same name
                     sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
 
                     sh """
                         docker run -d \
                             --name ${CONTAINER_NAME} \
-                            -p ${API_PORT}:${API_PORT} \
+                            -p ${API_PORT}:${CONTAINER_PORT} \
                             ${DOCKER_IMAGE}:latest
                     """
 
