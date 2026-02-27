@@ -387,6 +387,7 @@ pipeline {
                     sh """
                     docker run -d \
                         --name ${CONTAINER_NAME} \
+                        -p ${API_PORT}:${CONTAINER_PORT} \
                         ${DOCKER_IMAGE}:latest
                     """
 
@@ -395,7 +396,16 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    echo "✔ Container started. ID: ${containerId}"
+                    // Get internal IP for sibling-to-sibling communication
+                    def containerIp = sh(
+                        script: "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${CONTAINER_NAME}",
+                        returnStdout: true
+                    ).trim()
+
+                    echo "✔ Container started. ID: ${containerId} | IP: ${containerIp}"
+                    
+                    // Override API_HOST to use internal IP and internal port
+                    env.API_HOST = "http://${containerIp}:${CONTAINER_PORT}"
                 }
             }
         }
