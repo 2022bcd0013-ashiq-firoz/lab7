@@ -478,16 +478,14 @@ pipeline {
 
                     // Valid wine-quality feature payload (11 features)
                     def validPayload = '''{
-                        "fixed acidity": 7.4,
-                        "volatile acidity": 0.70,
-                        "citric acid": 0.00,
-                        "residual sugar": 1.9,
-                        "chlorides": 0.076,
-                        "free sulfur dioxide": 11.0,
-                        "total sulfur dioxide": 34.0,
-                        "density": 0.9978,
-                        "pH": 3.51,
-                        "sulphates": 0.56,
+                        "volatile_acidity": 0.70
+                        "citric_acid": 0.70
+                        "residual_sugar": 1.9
+                        "chlorides": 0.076
+                        "free_sulfur_dioxide": 11.0
+                        "total_sulfur_dioxide": 34.0
+                        "pH": 3.51
+                        "sulphates": 0.56
                         "alcohol": 9.4
                     }'''
 
@@ -568,8 +566,11 @@ pipeline {
 
                     // Malformed payload – missing required fields, wrong types
                     def invalidPayload = '''{
-                        "fixed acidity": "not-a-number",
-                        "volatile acidity": null
+                        "volatile_acidity": 0.70
+                        "citric_acid": 0.70
+                        "residual_sugar": "not a num
+                        "chlorides": null
+                        
                     }'''
 
                     def response = sh(
