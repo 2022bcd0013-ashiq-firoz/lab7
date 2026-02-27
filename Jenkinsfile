@@ -187,7 +187,8 @@ pipeline {
         CONTAINER_NAME = "wine-quality-test-${BUILD_NUMBER}"
         API_PORT = "5000"              // host port
         CONTAINER_PORT = "8002"       // internal app port
-        API_HOST = "http://localhost:${API_PORT}"
+        // NOTE: API_HOST is NOT defined here — it is built dynamically in Stage 2
+        // using the container's internal IP (required for Docker-out-of-Docker setup)
         HEALTH_ENDPOINT = "/"
         PREDICT_ENDPOINT = "/predict"
         HEALTH_TIMEOUT = "60"
@@ -396,7 +397,7 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    // Get internal IP for sibling-to-sibling communication
+                    // Get internal IP for sibling-to-sibling communication (DooD setup)
                     def containerIp = sh(
                         script: "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${CONTAINER_NAME}",
                         returnStdout: true
@@ -404,13 +405,14 @@ pipeline {
 
                     echo "✔ Container started. ID: ${containerId} | IP: ${containerIp}"
                     
-                    if (containerIp == "") {
+                    if (!containerIp) {
                         error("FAILED to retrieve container IP address. Check if container is running.")
                     }
 
-                    // Override API_HOST to use internal IP and internal port
-                    env.API_HOST = "http://${containerIp}:${CONTAINER_PORT}"
-                    echo "✔ API_HOST redirected to: ${env.API_HOST}"
+                    // Store the IP as a NEW env var (API_HOST is not defined in environment block,
+                    // so there is no immutable binding to conflict with)
+                    env.CONTAINER_IP = containerIp
+                    echo "✔ CONTAINER_IP set to: ${env.CONTAINER_IP} (will reach app on port ${CONTAINER_PORT})"
                 }
             }
         }
@@ -422,9 +424,11 @@ pipeline {
         stage('Stage 3: Wait for Service Readiness') {
             steps {
                 script {
+                    def apiBase = "http://${env.CONTAINER_IP}:${CONTAINER_PORT}"
+
                     echo "============================================"
                     echo "STAGE 3: Waiting for API to become ready"
-                    echo "Health endpoint : ${env.API_HOST}${HEALTH_ENDPOINT}"
+                    echo "Health endpoint : ${apiBase}${HEALTH_ENDPOINT}"
                     echo "Timeout         : ${HEALTH_TIMEOUT}s"
                     echo "============================================"
 
@@ -434,7 +438,7 @@ pipeline {
 
                     while (elapsed < HEALTH_TIMEOUT.toInteger()) {
                         def statusCode = sh(
-                            script: "curl -s -o /dev/null -w '%{http_code}' ${env.API_HOST}${HEALTH_ENDPOINT} 2>/dev/null || echo '000'",
+                            script: "curl -s -o /dev/null -w '%{http_code}' ${apiBase}${HEALTH_ENDPOINT} 2>/dev/null || echo '000'",
                             returnStdout: true
                         ).trim()
 
@@ -450,7 +454,6 @@ pipeline {
                     }
 
                     if (!ready) {
-                        // Dump container logs before failing for easier debugging
                         sh "docker logs ${CONTAINER_NAME} || true"
                         error("✘ Service did NOT become ready within ${HEALTH_TIMEOUT}s. Pipeline FAILED.")
                     }
@@ -470,6 +473,8 @@ pipeline {
                     echo "============================================"
                     echo "STAGE 4: Sending valid inference request"
                     echo "============================================"
+
+                    def apiBase = "http://${env.CONTAINER_IP}:${CONTAINER_PORT}"
 
                     // Valid wine-quality feature payload (11 features)
                     def validPayload = '''{
@@ -492,7 +497,7 @@ pipeline {
                                 -X POST \
                                 -H 'Content-Type: application/json' \
                                 -d '${validPayload}' \
-                                ${env.API_HOST}${PREDICT_ENDPOINT}
+                                ${apiBase}${PREDICT_ENDPOINT}
                         """,
                         returnStdout: true
                     ).trim()
@@ -559,6 +564,8 @@ pipeline {
                     echo "STAGE 5: Sending invalid / malformed request"
                     echo "============================================"
 
+                    def apiBase = "http://${env.CONTAINER_IP}:${CONTAINER_PORT}"
+
                     // Malformed payload – missing required fields, wrong types
                     def invalidPayload = '''{
                         "fixed acidity": "not-a-number",
@@ -571,7 +578,7 @@ pipeline {
                                 -X POST \
                                 -H 'Content-Type: application/json' \
                                 -d '${invalidPayload}' \
-                                ${env.API_HOST}${PREDICT_ENDPOINT}
+                                ${apiBase}${PREDICT_ENDPOINT}
                         """,
                         returnStdout: true
                     ).trim()
