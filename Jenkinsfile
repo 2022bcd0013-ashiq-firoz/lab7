@@ -188,7 +188,7 @@ pipeline {
         API_PORT = "5000"              // host port
         CONTAINER_PORT = "8002"       // internal app port
         API_HOST = "http://localhost:${API_PORT}"
-        HEALTH_ENDPOINT = "/health"
+        HEALTH_ENDPOINT = "/"
         PREDICT_ENDPOINT = "/predict"
         HEALTH_TIMEOUT = "60"
     }
@@ -403,11 +403,14 @@ pipeline {
         // ─────────────────────────────────────────
         // STAGE 3 : Wait for Service Readiness
         // ─────────────────────────────────────────
+
         stage('Stage 3: Wait for Service Readiness') {
             steps {
                 script {
                     echo "============================================"
                     echo "STAGE 3: Waiting for API to become ready"
+                    echo "Health endpoint : ${API_HOST}${HEALTH_ENDPOINT}"
+                    echo "Timeout         : ${HEALTH_TIMEOUT}s"
                     echo "============================================"
 
                     def ready = false
@@ -415,13 +418,8 @@ pipeline {
                     def interval = 5
 
                     while (elapsed < HEALTH_TIMEOUT.toInteger()) {
-
                         def statusCode = sh(
-                            script: """
-                                docker exec ${CONTAINER_NAME} \
-                                curl -s -o /dev/null -w '%{http_code}' \
-                                http://localhost:8082/health 2>/dev/null || echo 000
-                            """,
+                            script: "curl -s -o /dev/null -w '%{http_code}' ${API_HOST}${HEALTH_ENDPOINT} 2>/dev/null || echo '000'",
                             returnStdout: true
                         ).trim()
 
@@ -437,14 +435,15 @@ pipeline {
                     }
 
                     if (!ready) {
+                        // Dump container logs before failing for easier debugging
                         sh "docker logs ${CONTAINER_NAME} || true"
-                        error("✘ Service did NOT become ready within ${HEALTH_TIMEOUT}s.")
+                        error("✘ Service did NOT become ready within ${HEALTH_TIMEOUT}s. Pipeline FAILED.")
                     }
 
-                    echo "✔ Service is ready."
+                    echo "✔ Service is ready and responding."
                 }
             }
-        }   
+        }
 
         // ─────────────────────────────────────────
         // STAGE 4 : Send Valid Inference Request
@@ -474,7 +473,7 @@ pipeline {
 
                     def response = sh(
                         script: """
-                            docker exec ${CONTAINER_NAME} curl -s -w '\\nHTTP_STATUS:%{http_code}' \
+                            curl -s -w '\\nHTTP_STATUS:%{http_code}' \
                                 -X POST \
                                 -H 'Content-Type: application/json' \
                                 -d '${validPayload}' \
@@ -553,7 +552,7 @@ pipeline {
 
                     def response = sh(
                         script: """
-                            docker exec ${CONTAINER_NAME} curl -s -w '\\nHTTP_STATUS:%{http_code}' \
+                            curl -s -w '\\nHTTP_STATUS:%{http_code}' \
                                 -X POST \
                                 -H 'Content-Type: application/json' \
                                 -d '${invalidPayload}' \
