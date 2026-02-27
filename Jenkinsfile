@@ -511,30 +511,30 @@ pipeline {
 
                     // Validation 2 – 'prediction' field must exist
                     def hasPrediction = sh(
-                        script: "echo '${body}' | jq 'has(\"prediction\")' 2>/dev/null || echo 'false'",
+                        script: "echo '${body}' | jq 'has(\"wine_quality\")' 2>/dev/null || echo 'false'",
                         returnStdout: true
                     ).trim()
 
                     if (hasPrediction != 'true') {
-                        error("✘ Valid request FAILED: 'prediction' field missing in response body.")
+                        error("✘ Valid request FAILED: 'wine_quality' field missing in response body.")
                     }
-                    echo "✔ 'prediction' field exists in response."
+                    echo "✔ 'wine_quality' field exists in response."
 
                     // Validation 3 – prediction value must be numeric
                     def predValue = sh(
-                        script: "echo '${body}' | jq -r '.prediction' 2>/dev/null || echo 'null'",
+                        script: "echo '${body}' | jq -r '.wine_quality' 2>/dev/null || echo 'null'",
                         returnStdout: true
                     ).trim()
 
                     echo "Prediction value : ${predValue}"
 
                     def isNumeric = sh(
-                        script: "echo '${body}' | jq '.prediction | type == \"number\"' 2>/dev/null || echo 'false'",
+                        script: "echo '${body}' | jq '.wine_quality | type == \"number\"' 2>/dev/null || echo 'false'",
                         returnStdout: true
                     ).trim()
 
                     if (isNumeric != 'true') {
-                        error("✘ Valid request FAILED: 'prediction' value '${predValue}' is not numeric.")
+                        error("✘ Valid request FAILED: 'wine_quality' value '${predValue}' is not numeric.")
                     }
 
                     echo "✔ Prediction value is numeric (${predValue}). All validations PASSED."
